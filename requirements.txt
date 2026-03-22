@@ -1,0 +1,30 @@
+# MoE语言模型端到端效率优化 - 依赖列表
+
+# 核心依赖
+torch==2.1.0
+transformers==4.47.1
+accelerate>=0.25.0
+datasets>=2.14.0
+
+# 量化依赖
+bitsandbytes>=0.41.0
+auto-gptq>=0.6.0  # 可选，用于GPTQ量化
+
+# 数据处理
+sentencepiece>=0.1.99
+protobuf>=3.20.0
+scikit-learn>=1.3.0
+numpy>=1.24.0
+pandas>=2.0.0
+
+# 工具
+tqdm>=4.65.0
+requests>=2.31.0
+
+# 日志和监控
+tensorboard>=2.14.0  # 可选
+
+# 开发工具
+flake8>=6.0.0
+mypy>=1.5.0
+black>=23.0.0
