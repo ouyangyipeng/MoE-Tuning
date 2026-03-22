@@ -2,7 +2,7 @@
 基线测试脚本 - MoE语言模型端到端效率优化
 
 功能：
-1. 加载Mixtral-8x7B模型
+1. 加载Mixtral-8x7B模型（从HuggingFace直接加载）
 2. 在wikitext-103-v1数据集上测试
 3. 测量推理延迟、显存占用、困惑度
 """
@@ -14,11 +14,6 @@ import json
 import logging
 from datetime import datetime
 from typing import Dict, List, Tuple, Optional
-
-import torch
-import torch.nn as nn
-from torch.utils.data import DataLoader
-from tqdm import tqdm
 
 # 添加项目根目录到路径
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -48,25 +43,28 @@ class BaselineTester:
         setup_environment()
         
         # 检查CUDA可用性
-        if torch.cuda.is_available():
-            logger.info(f"CUDA可用，设备数量: {torch.cuda.device_count()}")
-            for i in range(torch.cuda.device_count()):
-                logger.info(f"  设备 {i}: {torch.cuda.get_device_name(i)}")
-                logger.info(f"  显存: {torch.cuda.get_device_properties(i).total_memory / 1024**3:.2f} GB")
-        else:
-            logger.warning("CUDA不可用，将使用CPU运行")
-            self.device = "cpu"
+        try:
+            import torch
+            if torch.cuda.is_available():
+                logger.info(f"CUDA可用，设备数量: {torch.cuda.device_count()}")
+                for i in range(torch.cuda.device_count()):
+                    logger.info(f"  设备 {i}: {torch.cuda.get_device_name(i)}")
+                    logger.info(f"  显存: {torch.cuda.get_device_properties(i).total_memory / 1024**3:.2f} GB")
+            else:
+                logger.warning("CUDA不可用，将使用CPU运行")
+                self.device = "cpu"
+        except ImportError:
+            logger.error("PyTorch未安装")
+            raise
     
     def load_model(self, use_quantization: bool = False):
         """加载模型"""
         from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+        import torch
         
-        logger.info(f"加载模型: {self.config.model.model_name}")
-        
-        model_path = self.config.model.model_path
-        if not os.path.exists(model_path):
-            logger.warning(f"模型路径不存在: {model_path}，将从HuggingFace下载")
-            model_path = self.config.model.model_name
+        model_name = self.config.model.model_name
+        logger.info(f"加载模型: {model_name}")
+        logger.info("从HuggingFace直接加载（不下载到本地）...")
         
         # 量化配置
         quantization_config = None
@@ -80,22 +78,23 @@ class BaselineTester:
         # 加载tokenizer
         logger.info("加载tokenizer...")
         self.tokenizer = AutoTokenizer.from_pretrained(
-            model_path,
+            model_name,
             trust_remote_code=True,
             use_fast=True
         )
         
         # 加载模型
-        logger.info("加载模型...")
+        logger.info("加载模型（这可能需要几分钟）...")
         start_time = time.time()
         
         if self.device == "cuda":
             # 多GPU设置
+            import torch
             if torch.cuda.device_count() > 1:
                 logger.info(f"使用 {torch.cuda.device_count()} 个GPU")
             
             self.model = AutoModelForCausalLM.from_pretrained(
-                model_path,
+                model_name,
                 quantization_config=quantization_config,
                 device_map="auto",
                 trust_remote_code=True,
@@ -104,7 +103,7 @@ class BaselineTester:
             )
         else:
             self.model = AutoModelForCausalLM.from_pretrained(
-                model_path,
+                model_name,
                 trust_remote_code=True,
                 torch_dtype=torch.float32
             )
@@ -124,6 +123,7 @@ class BaselineTester:
         logger.info(f"可训练参数: {trainable_params / 1e9:.2f}B")
         
         if self.device == "cuda":
+            import torch
             allocated = torch.cuda.memory_allocated() / 1024**3
             reserved = torch.cuda.memory_reserved() / 1024**3
             logger.info(f"GPU显存已分配: {allocated:.2f} GB")
@@ -135,20 +135,11 @@ class BaselineTester:
         
         logger.info(f"加载数据集: {self.config.data.dataset_name}")
         
-        data_path = self.config.data.data_path
-        if os.path.exists(data_path):
-            dataset = load_dataset(
-                self.config.data.dataset_name,
-                self.config.data.dataset_config,
-                data_dir=data_path,
-                split="test"
-            )
-        else:
-            dataset = load_dataset(
-                self.config.data.dataset_name,
-                self.config.data.dataset_config,
-                split="test"
-            )
+        dataset = load_dataset(
+            self.config.data.dataset_name,
+            self.config.data.dataset_config,
+            split="test"
+        )
         
         logger.info(f"数据集大小: {len(dataset)} 条")
         return dataset
@@ -156,6 +147,7 @@ class BaselineTester:
     def preprocess_data(self, dataset) -> List[str]:
         """预处理数据"""
         logger.info("预处理数据...")
+        from tqdm import tqdm
         
         texts = []
         for item in tqdm(dataset, desc="预处理"):
@@ -173,6 +165,9 @@ class BaselineTester:
     
     def measure_latency(self, texts: List[str]) -> Dict:
         """测量推理延迟"""
+        import torch
+        from tqdm import tqdm
+        
         logger.info("测量推理延迟...")
         
         latencies = []
@@ -239,6 +234,9 @@ class BaselineTester:
     
     def calculate_perplexity(self, texts: List[str]) -> float:
         """计算困惑度"""
+        import torch
+        from tqdm import tqdm
+        
         logger.info("计算困惑度...")
         
         self.model.eval()

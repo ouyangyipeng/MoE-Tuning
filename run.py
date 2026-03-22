@@ -46,22 +46,10 @@ def run_baseline_test(args):
 def run_optimized_test(args):
     """运行优化测试"""
     from src.baseline.test_baseline import BaselineTester
-    from src.optimization.quantization import Quantizer, QuantizationConfig
-    from src.optimization.memory import MemoryOptimizer, MemoryConfig
     
     logger.info("=" * 60)
     logger.info("运行优化测试")
     logger.info("=" * 60)
-    
-    # 配置优化
-    quant_config = QuantizationConfig(
-        method=args.quantization
-    )
-    
-    memory_config = MemoryConfig(
-        offload_to_cpu=args.offload,
-        max_memory_per_gpu=args.max_memory
-    )
     
     # 运行测试
     tester = BaselineTester()
@@ -114,11 +102,24 @@ def compare_results(baseline: dict, optimized: dict):
     return comparison
 
 
+def run_small_model_test(args):
+    """运行小模型测试（验证代码逻辑）"""
+    import test_small_model
+    
+    logger.info("=" * 60)
+    logger.info("运行小模型测试（验证代码逻辑）")
+    logger.info("=" * 60)
+    
+    results = test_small_model.run_all_tests()
+    
+    return results
+
+
 def main():
     parser = argparse.ArgumentParser(description="MoE语言模型端到端效率优化")
-    parser.add_argument("--mode", type=str, default="baseline",
-                       choices=["baseline", "optimized", "compare"],
-                       help="运行模式")
+    parser.add_argument("--mode", type=str, default="small",
+                       choices=["baseline", "optimized", "compare", "small"],
+                       help="运行模式: baseline=基线测试, optimized=优化测试, compare=对比测试, small=小模型测试")
     parser.add_argument("--quantization", type=str, default="int8",
                        choices=["none", "int8", "int4"],
                        help="量化方法")
@@ -141,7 +142,10 @@ def main():
     
     results = None
     
-    if args.mode == "baseline":
+    if args.mode == "small":
+        # 小模型测试（验证代码逻辑）
+        results = run_small_model_test(args)
+    elif args.mode == "baseline":
         results = run_baseline_test(args)
     elif args.mode == "optimized":
         results = run_optimized_test(args)

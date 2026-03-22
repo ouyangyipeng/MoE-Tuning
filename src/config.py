@@ -3,14 +3,14 @@
 """
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional
 
 @dataclass
 class ModelConfig:
     """模型配置"""
     model_name: str = "mistralai/Mixtral-8x7B-v0.1"
-    model_path: str = "./models/Mixtral-8x7B-v0.1"
+    model_path: str = ""  # 留空表示从HuggingFace直接加载
     num_experts: int = 8
     num_experts_per_tok: int = 2
     hidden_size: int = 4096
@@ -23,8 +23,8 @@ class DataConfig:
     """数据配置"""
     dataset_name: str = "wikitext"
     dataset_config: str = "wikitext-103-v1"
-    data_path: str = "./data/wikitext"
-    max_samples: int = 1000  # 测试时使用的样本数
+    data_path: str = ""  # 留空表示从HuggingFace直接加载
+    max_samples: int = 100  # 测试时使用的样本数
     max_length: int = 512    # 最大序列长度
 
 @dataclass
@@ -58,20 +58,10 @@ class HardwareConfig:
 @dataclass
 class Config:
     """总配置"""
-    model: ModelConfig = None
-    data: DataConfig = None
-    optimization: OptimizationConfig = None
-    hardware: HardwareConfig = None
-    
-    def __post_init__(self):
-        if self.model is None:
-            self.model = ModelConfig()
-        if self.data is None:
-            self.data = DataConfig()
-        if self.optimization is None:
-            self.optimization = OptimizationConfig()
-        if self.hardware is None:
-            self.hardware = HardwareConfig()
+    model: ModelConfig = field(default_factory=ModelConfig)
+    data: DataConfig = field(default_factory=DataConfig)
+    optimization: OptimizationConfig = field(default_factory=OptimizationConfig)
+    hardware: HardwareConfig = field(default_factory=HardwareConfig)
 
 # 默认配置
 default_config = Config()
